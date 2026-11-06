@@ -14,7 +14,7 @@ A QSAR (quantitative structure-activity relationship) model, trained in R, predi
 ## Repository layout
 
 ```
-data/        Cleaned ChEMBL1978 IC50 dataset (2,751 compounds) and fetch script
+data/        Cleaned ChEMBL1978 IC50 dataset (2,751 compounds) used for R training
 docker/      R training script, Plumber API, Dockerfile, SPCS spec, model artifacts
 streamlit/   Multipage Streamlit app (Dashboard, Single and Batch Prediction, About)
 notebooks/   Workspace notebook: raw ChEMBL records to dashboard data on the stage
@@ -26,13 +26,16 @@ docs/        MCP walkthrough
 
 ## Quick start
 
-1. Run `sql/setup.sql` in Snowsight (replace `<your_user>`).
+The developer guide walks through each step in detail.
+
+1. Run `sql/setup.sql` in Snowsight (replace `<your_user>`). It creates the role, warehouse, database, compute pools, stage, image repository, audit table, and external access integrations.
 2. Build and push the image:
    ```bash
    cd docker
    snow spcs image-registry login
    docker build --platform linux/amd64 -f Dockerfile.plumber -t <repository_url>/r-qsar-plumber:v1 .
    docker push <repository_url>/r-qsar-plumber:v1
+   cd ..
    ```
 3. Create the service with `docker/plumber_spec.yaml` (see the commented block at the end of `sql/setup.sql`).
 4. Smoke-test the endpoint:
@@ -41,10 +44,41 @@ docs/        MCP walkthrough
    export SNOWFLAKE_PAT="<programmatic access token>"
    python scripts/test_endpoint.py
    ```
+5. Prepare the dashboard data by running `notebooks/prepare_dashboard_data.ipynb` in Snowflake. It fetches raw ChEMBL records, cleans them, scores them with the service, and writes the dashboard CSVs to `@QSAR_STAGE`:
+   ```sql
+   USE SCHEMA QSAR_DB.PUBLIC;
+   CREATE STAGE IF NOT EXISTS NB_PROJECT_STAGE;
+   -- snow sql -q "PUT file://notebooks/prepare_dashboard_data.ipynb @QSAR_DB.PUBLIC.NB_PROJECT_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE"
+   CREATE OR REPLACE NOTEBOOK PROJECT DASHBOARD_DATA_PROJ FROM '@NB_PROJECT_STAGE';
+   EXECUTE NOTEBOOK PROJECT DASHBOARD_DATA_PROJ
+       MAIN_FILE = 'prepare_dashboard_data.ipynb'
+       COMPUTE_POOL = 'QSAR_ST_POOL'
+       QUERY_WAREHOUSE = 'QSAR_WH'
+       RUNTIME = 'V2-CPU-PY3.12'
+       EXTERNAL_ACCESS_INTEGRATIONS = (QSAR_NB_EAI);
+   ```
+   Then upload the model metadata that the About and Dashboard pages read:
+   ```bash
+   cp docker/top_features_rcdk.csv /tmp/top_features.csv
+   snow sql -q "PUT file:///tmp/top_features.csv @QSAR_DB.PUBLIC.QSAR_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE"
+   snow sql -q "PUT file://docker/training_metrics.json @QSAR_DB.PUBLIC.QSAR_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE"
+   ```
+6. Deploy the Streamlit app. In `streamlit/_shared.py`, replace `<hash>` in the service URL with the `dns_name` from `SHOW SERVICES`, then:
+   ```bash
+   cd streamlit
+   snow streamlit deploy --replace
+   ```
+7. Optionally, connect an AI assistant to the MCP endpoint at `https://<ingress_url>/mcp`. See `docs/mcp-walkthrough.md`.
 
-Full instructions are in the developer guide.
+To prepare the dashboard data from a laptop instead of step 5, run `scripts/generate_dashboard_data.py`, which reads `data/chembl1978_cleaned.csv` and calls the public endpoint with a PAT.
+
+## Clean up
+
+Drop the objects in reverse order: the Streamlit app and service, then the compute pools, integrations, database, warehouse, and role. The guide's Clean Up section lists the exact commands.
 
 ## Retrain the model
+
+To retrain on fresh ChEMBL data, download `chembl1978_cleaned.csv` from `@QSAR_STAGE` (written by the notebook) into `data/` first.
 
 ```bash
 docker build --platform linux/amd64 -f docker/Dockerfile.plumber -t r-qsar-plumber:local docker
