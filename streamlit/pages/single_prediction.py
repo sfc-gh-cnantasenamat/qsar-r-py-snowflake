@@ -9,30 +9,12 @@ from _shared import EXAMPLES, smiles_to_image, smiles_to_names, predict_pic50, l
 
 _ALL_CLASSES = ["Active", "Intermediate", "Inactive"]
 
-# ── Sidebar controls (only visible on this page) ──────────────────────────────
-with st.sidebar:
-    with st.expander(":material/settings: Prediction settings", expanded=True):
-        input_method = st.radio(
-            "Input method",
-            ["SMILES text", "Draw structure"],
-            horizontal=True,
-            key="input_method",
-        )
-        st.markdown("")
-        example_choice = st.radio(
-            "Try an example molecule:",
-            options=["(none)"] + list(EXAMPLES.keys()),
-            key="example_choice",
-        )
-
 # Read shared settings
 threshold       = st.session_state.get("threshold", (6.0, 7.0))
 threshold_lo    = threshold[0]
 threshold_hi    = threshold[1]
 show_ic50       = st.session_state.get("show_ic50", False)
 activity_filter = st.session_state.get("activity_filter", _ALL_CLASSES)
-
-active_smiles = "" if example_choice == "(none)" else EXAMPLES[example_choice]
 
 st.title(":material/biotech: Single Prediction")
 st.caption(
@@ -43,7 +25,21 @@ st.caption(
 # ── Input container ───────────────────────────────────────────────────────────
 st.subheader("Input")
 with st.container(border=True):
-    st.markdown("")
+    input_method = st.radio(
+        "Input method",
+        ["SMILES text", "Draw structure"],
+        horizontal=True,
+        key="input_method",
+    )
+    example_choice = st.radio(
+        "Try an example molecule:",
+        options=["(none)"] + list(EXAMPLES.keys()),
+        horizontal=True,
+        key="example_choice",
+    )
+    active_smiles = "" if example_choice == "(none)" else EXAMPLES[example_choice]
+
+    st.divider()
 
     if input_method == "SMILES text":
         # Only reset the field when the example selection changes, so typed input survives reruns
