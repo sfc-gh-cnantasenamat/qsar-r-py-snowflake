@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 from streamlit_jsme import st_jsme
 
-from _shared import EXAMPLES, smiles_to_image, smiles_to_names, predict_pic50, log_prediction
+from _shared import EXAMPLES, smiles_to_image, smiles_to_names, predict_pic50, log_prediction, running_in_snowflake
 
 _ALL_CLASSES = ["Active", "Intermediate", "Inactive"]
 
@@ -18,19 +18,24 @@ activity_filter = st.session_state.get("activity_filter", _ALL_CLASSES)
 
 st.title(":material/biotech: Single Prediction")
 st.caption(
-    "Draw or type a SMILES string to predict the pIC50 and "
+    ("Type" if running_in_snowflake() else "Draw or type")
+    + " a SMILES string to predict the pIC50 and "
     "90% confidence interval for a single compound."
 )
 
 # ── Input container ───────────────────────────────────────────────────────────
 st.subheader("Input")
 with st.container(border=True):
-    input_method = st.radio(
-        "Input method",
-        ["SMILES text", "Draw structure"],
-        horizontal=True,
-        key="input_method",
-    )
+    # The JSME drawing editor is offered only outside Snowflake (local or Community Cloud)
+    if running_in_snowflake():
+        input_method = "SMILES text"
+    else:
+        input_method = st.radio(
+            "Input method",
+            ["SMILES text", "Draw structure"],
+            horizontal=True,
+            key="input_method",
+        )
     example_choice = st.radio(
         "Try an example molecule:",
         options=["(none)"] + list(EXAMPLES.keys()),

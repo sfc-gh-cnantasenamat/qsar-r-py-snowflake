@@ -55,6 +55,17 @@ def get_spcs_token() -> str:
     return _secret("spcs", "token") or _secret("connections", "snowflake", "password", default="")
 
 
+@st.cache_resource
+def running_in_snowflake() -> bool:
+    """True inside Streamlit in Snowflake, where an active Snowpark session is provided."""
+    try:
+        from snowflake.snowpark.context import get_active_session
+        get_active_session()
+        return True
+    except Exception:
+        return False
+
+
 def _create_session():
     try:
         from snowflake.snowpark.context import get_active_session
