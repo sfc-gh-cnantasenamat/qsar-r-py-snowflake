@@ -1,0 +1,11 @@
+{
+  "oob_r2": 0.6490,
+  "test_r2": 0.6855,
+  "test_rmse": 0.7708,
+  "n_train": 2203,
+  "n_test": 548,
+  "n_bits": 178,
+  "n_trees": 500,
+  "fingerprint": "CDK ECFP4 (rcdk 3.8.2)",
+  "model": "ranger quantile RF"
+}

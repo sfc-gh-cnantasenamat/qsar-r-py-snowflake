@@ -1,0 +1,52 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Pure R inference image for QSAR Aromatase SPCS service.
+# Serves predictions via R Plumber — no Python, no rpy2 bridge.
+#
+# Stack: rocker/r-ver:4.3.2 + Java (for rcdk/CDK) + rcdk + ranger + plumber
+#
+# Build:
+#   docker build -f Dockerfile.plumber -t r-qsar-plumber:latest .
+#
+# Push:
+#   docker tag r-qsar-plumber:latest \
+#     <org>-<account>.registry.snowflakecomputing.com/qsar_db/public/qsar_repo/r-qsar-plumber:latest
+#   docker push \
+#     <org>-<account>.registry.snowflakecomputing.com/qsar_db/public/qsar_repo/r-qsar-plumber:latest
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM rocker/r-ver:4.3.2
+
+# ── System dependencies ───────────────────────────────────────────────────────
+# default-jdk  : required by rcdk (CDK cheminformatics library is Java-based)
+RUN apt-get update && apt-get install -y \
+    default-jdk \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libsodium-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure R's Java binding after JDK install
+RUN R CMD javareconf
+
+# ── R packages via Posit Package Manager (pre-compiled binaries for jammy) ────
+# Using PPM avoids compilation failures under QEMU x86_64 emulation.
+RUN Rscript -e " \
+    options(repos = c(PPM = 'https://packagemanager.posit.co/cran/__linux__/jammy/latest')); \
+    install.packages(c('rJava', 'rcdk', 'ranger', 'plumber', 'jsonlite'), Ncpus = 4); \
+    for (pkg in c('rJava', 'rcdk', 'ranger', 'plumber', 'jsonlite')) { \
+        if (!requireNamespace(pkg, quietly = TRUE)) stop(paste0('MISSING: ', pkg)) \
+    }; \
+    message('All packages verified OK')"
+
+# ── Model artifacts (baked in — 4 MB total, no stage mount needed) ────────────
+COPY qsar_aromatase_model.rds /model/qsar_aromatase_model.rds
+COPY kept_bits.csv             /model/kept_bits.csv
+
+# ── API ───────────────────────────────────────────────────────────────────────
+COPY plumber_api.R /api/plumber_api.R
+
+EXPOSE 5000
+
+CMD ["Rscript", "-e", \
+     "pr <- plumber::plumb('/api/plumber_api.R'); pr$run(host='0.0.0.0', port=5000)"]

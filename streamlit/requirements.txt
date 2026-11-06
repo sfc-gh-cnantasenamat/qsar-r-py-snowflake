@@ -1,0 +1,5 @@
+streamlit>=1.61.0
+streamlit-jsme>=0.1.10
+snowflake-connector-python
+snowflake-snowpark-python
+rdkit

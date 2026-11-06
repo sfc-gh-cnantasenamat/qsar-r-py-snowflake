@@ -1,0 +1,16 @@
+definition_version: 2
+entities:
+  qsar_aromatase_app:
+    type: streamlit
+    identifier:
+      database: QSAR_DB
+      schema: PUBLIC
+      name: QSAR_AROMATASE_APP
+    main_file: app.py
+    query_warehouse: QSAR_WH
+    title: "QSAR Aromatase Inhibitor Predictor"
+    artifacts:
+      - app.py
+      - _shared.py
+      - pages/
+      - requirements.txt

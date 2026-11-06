@@ -1,0 +1,27 @@
+manifest_version: 1
+
+version:
+  name: V1
+  label: "1.0.0"
+  comment: "QSAR Aromatase Inhibitor MCP Server — ranger RF (R) via Plumber on SPCS"
+
+artifacts:
+  setup_script: setup.sql
+  readme: README.md
+  container_services:
+    uses_gpu: false
+    images:
+      - /qsar_mcp_pkg/app_code/app_image_repo/r-qsar-plumber:latest
+
+configuration:
+  grant_callback: app_schema.grant_callback
+
+privileges:
+  - CREATE COMPUTE POOL:
+      description: >
+        Required to create the compute pool where the R Plumber MCP inference
+        service runs. A small CPU_X64_XS pool is created automatically.
+  - BIND SERVICE ENDPOINT:
+      description: >
+        Required to expose the /mcp and /predict endpoints publicly so
+        AI agents and MCP clients can call the pIC50 prediction service.

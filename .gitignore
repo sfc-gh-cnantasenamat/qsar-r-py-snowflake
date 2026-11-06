@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+.pytest_cache/
+
+# R
+.Rhistory
+.RData
+*.Rproj.user/
+
+# Snowflake
+.snowflake/
+connections.toml
+
+# Environment / secrets
+.env
+*.env
+*.key
+*.pem
+secrets.toml
+credentials.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data outputs (large generated files)
+output/
+
+# Optional / experimental (not part of production pipeline)
+notebook/qsar_pipeline.py

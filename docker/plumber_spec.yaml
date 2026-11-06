@@ -1,0 +1,20 @@
+spec:
+  containers:
+    - name: qsar-r-plumber
+      image: /qsar_db/public/qsar_repo/r-qsar-plumber:v1
+      env:
+        PORT: "5000"
+      readinessProbe:
+        port: 5000
+        path: /health
+      resources:
+        requests:
+          memory: 0.5Gi
+          cpu: 0.5
+        limits:
+          memory: 13Gi
+          cpu: 3
+  endpoints:
+    - name: api
+      port: 5000
+      public: true
