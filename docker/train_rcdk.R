@@ -82,4 +82,19 @@ imp_df <- data.frame(bit = names(imp), importance = imp)
 imp_df <- imp_df[order(-imp_df$importance), ]
 write.csv(head(imp_df, 20), "/output/top_features_rcdk.csv", row.names = FALSE)
 
+metrics <- list(
+  oob_r2      = round(model$r.squared, 4),
+  test_r2     = round(r2, 4),
+  test_rmse   = round(rmse, 4),
+  n_compounds = nrow(df),
+  n_active    = sum(df$activity_class),
+  n_train     = nrow(train_df),
+  n_test      = length(test_y),
+  n_bits      = ncol(fp_matrix),
+  n_trees     = model$num.trees,
+  fingerprint = sprintf("CDK ECFP4 (rcdk %s)", packageVersion("rcdk")),
+  model       = "ranger quantile RF"
+)
+jsonlite::write_json(metrics, "/output/training_metrics.json", auto_unbox = TRUE, pretty = TRUE)
+
 cat("Done.\n")

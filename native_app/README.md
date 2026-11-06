@@ -16,7 +16,7 @@ Provides an MCP tool `predict_pic50(smiles)` that returns:
 - **Algorithm**: ranger Random Forest, 500 trees, `quantreg=TRUE`
 - **Features**: CDK ECFP4 fingerprints (rcdk 3.8.2), 178 informative bits
 - **Training data**: ChEMBL1978 — 2751 human aromatase IC50 measurements
-- **Performance**: Test R² = 0.685, RMSE = 0.771 log units
+- **Performance**: reported by the `get_model_info` tool from the `training_metrics.json` baked into the image
 - **Language**: Pure R (rcdk + ranger + Plumber) — no Python/rpy2
 
 ## Installation

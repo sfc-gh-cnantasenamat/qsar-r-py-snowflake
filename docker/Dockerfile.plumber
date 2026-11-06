@@ -42,6 +42,7 @@ RUN Rscript -e " \
 # ── Model artifacts (baked in — 4 MB total, no stage mount needed) ────────────
 COPY qsar_aromatase_model.rds /model/qsar_aromatase_model.rds
 COPY kept_bits.csv             /model/kept_bits.csv
+COPY training_metrics.json     /model/training_metrics.json
 
 # ── API ───────────────────────────────────────────────────────────────────────
 COPY plumber_api.R /api/plumber_api.R

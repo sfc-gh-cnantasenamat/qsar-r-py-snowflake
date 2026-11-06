@@ -2,14 +2,16 @@
 
 import streamlit as st
 
+from _shared import load_metrics
+
 st.title(":material/info: About")
 st.subheader("About this model")
 st.markdown(
     "This app predicts the **pIC50** of small molecules against human "
     "**aromatase (CYP19A1)**, a key enzyme in estrogen biosynthesis relevant "
-    "to breast cancer research. The full pipeline — data preparation, "
-    "fingerprint computation, model training, and inference — is implemented "
-    "entirely in **R** and served live from a Snowpark Container Services (SPCS) pod."
+    "to breast cancer research. Data is curated from ChEMBL in a Snowflake "
+    "notebook; fingerprint computation, model training, and inference are "
+    "implemented in **R** and served live from a Snowpark Container Services (SPCS) pod."
 )
 
 st.subheader("Dataset")
@@ -34,8 +36,12 @@ st.markdown("""
   stored in `kept_bits.csv` and loaded at container start-up
 """)
 
+_m = load_metrics()
+performance = (f"Test R² = {_m['test_r2']:.3f}, RMSE = {_m['test_rmse']:.3f} log units on the held-out set"
+               if _m else "see `training_metrics.json`")
+
 st.subheader("Model")
-st.markdown("""
+st.markdown(f"""
 - **Package:** `ranger` — a fast C++ implementation of Random Forests for R
 - **Trees:** 500 (`num.trees = 500`)
 - **Regression mode:** quantile regression (`quantreg = TRUE`) — enables
@@ -43,7 +49,7 @@ st.markdown("""
 - **Inference:** `predict(model, data, type = "quantiles", quantiles = c(0.05, 0.5, 0.95))`
   returns the 5th, 50th (median pIC50), and 95th percentiles in one pass,
   giving the prediction and its 90 % confidence interval simultaneously
-- **Performance:** Test R² = 0.685, RMSE = 0.771 log units on the held-out set
+- **Performance:** {performance}
 - **Serving:** the trained model (`.rds`) and `kept_bits.csv` are baked into
   the Docker image at build time; a `plumber` REST API exposes `/predict` and
   `/mcp` endpoints; the JVM (required by rcdk / CDK) is pre-warmed at container

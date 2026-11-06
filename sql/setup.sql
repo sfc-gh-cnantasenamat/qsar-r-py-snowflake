@@ -84,8 +84,8 @@ CREATE EXTERNAL ACCESS INTEGRATION IF NOT EXISTS QSAR_APP_EAI
     ENABLED = TRUE;
 GRANT USAGE ON INTEGRATION QSAR_APP_EAI TO ROLE QSAR_ROLE;
 
--- Egress for notebooks/prepare_dashboard_data.ipynb: ChEMBL REST API and PyPI (RDKit).
--- The notebook can run on QSAR_ST_POOL.
+-- Egress for notebooks/01_prepare_training_data.ipynb (ChEMBL REST API and PyPI for RDKit)
+-- and 02_score_compounds.ipynb. Both notebooks can run on QSAR_ST_POOL.
 CREATE NETWORK RULE IF NOT EXISTS QSAR_DB.PUBLIC.QSAR_NB_EGRESS
     TYPE = HOST_PORT
     MODE = EGRESS

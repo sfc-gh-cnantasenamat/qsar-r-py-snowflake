@@ -22,6 +22,8 @@ cat("Loading model artifacts...\n")
 model     <- readRDS("/model/qsar_aromatase_model.rds")
 kept_bits <- read.csv("/model/kept_bits.csv")$bit
 n_bits    <- length(kept_bits)
+# Metrics written by train_rcdk.R for this model; reported by the MCP tools
+metrics   <- jsonlite::read_json("/model/training_metrics.json")
 cat(sprintf("  ranger model: %d trees, %d features\n", model$num.trees, n_bits))
 
 # ── Pre-warm rcdk JVM (avoids cold-start latency on first request) ────────────
@@ -337,12 +339,12 @@ function(req) {
         trees            = model$num.trees,
         target           = "human aromatase (CYP19A1)",
         dataset          = "ChEMBL1978",
-        n_train          = 2203L,
-        n_test           = 548L,
+        n_train          = metrics$n_train,
+        n_test           = metrics$n_test,
         n_features       = n_bits,
         fingerprint      = "CDK ECFP4 radius-2 1024-bit",
-        test_r2          = 0.685,
-        test_rmse_log    = 0.771,
+        test_r2          = metrics$test_r2,
+        test_rmse_log    = metrics$test_rmse,
         active_threshold = 6.5,
         threshold_unit   = "pIC50 (-log10 IC50 [M])"
       )
@@ -395,13 +397,13 @@ function(req) {
       stats <- list(
         dataset          = "ChEMBL1978",
         target           = "human aromatase (CYP19A1)",
-        n_total          = 2751L,
-        n_active         = 1061L,
-        n_inactive       = 1690L,
-        pct_active       = 38.6,
-        pct_inactive     = 61.4,
-        n_train          = 2203L,
-        n_test           = 548L,
+        n_total          = metrics$n_compounds,
+        n_active         = metrics$n_active,
+        n_inactive       = metrics$n_compounds - metrics$n_active,
+        pct_active       = round(100 * metrics$n_active / metrics$n_compounds, 1),
+        pct_inactive     = round(100 * (1 - metrics$n_active / metrics$n_compounds), 1),
+        n_train          = metrics$n_train,
+        n_test           = metrics$n_test,
         fingerprint      = "CDK ECFP4 radius-2 1024-bit",
         n_features_used  = n_bits,
         activity_label   = "Active if pIC50 >= 6.5 (IC50 <= 316 nM)",

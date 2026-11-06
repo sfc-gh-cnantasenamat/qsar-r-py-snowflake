@@ -1,7 +1,9 @@
 {
-  "oob_r2": 0.6490,
+  "oob_r2": 0.649,
   "test_r2": 0.6855,
   "test_rmse": 0.7708,
+  "n_compounds": 2751,
+  "n_active": 1061,
   "n_train": 2203,
   "n_test": 548,
   "n_bits": 178,
