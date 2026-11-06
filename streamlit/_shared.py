@@ -26,10 +26,11 @@ _DB_SCHEMA = "QSAR_DB.PUBLIC"
 _STAGE = f"@{_DB_SCHEMA}.QSAR_STAGE"
 
 EXAMPLES = {
-    "Active — Letrozole analogue": "N#Cc1ccnc(Cc2ccc(C3=NN=C(c4ccc(F)cc4)N3)cc2)c1",
-    "Active — Anastrozole":        "CC(C)(C#N)C1=CC(=CC(=C1)CN2C=NC=N2)C(C)(C)C#N",
-    "Inactive — Aspirin":          "CC(=O)Oc1ccccc1C(=O)O",
-    "Inactive — Caffeine":         "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+    "FDA-approved — Letrozole (Femara)":     "N#Cc1ccc(cc1)C(n1cncn1)c1ccc(C#N)cc1",
+    "FDA-approved — Anastrozole (Arimidex)": "CC(C)(C#N)c1cc(Cn2cncn2)cc(c1)C(C)(C)C#N",
+    "FDA-approved — Exemestane (Aromasin)":  "C[C@]12CC[C@H]3[C@@H](CC(=C)C4=CC(=O)C=C[C@]34C)[C@@H]1CCC2=O",
+    "Inactive — Aspirin":                    "CC(=O)Oc1ccccc1C(=O)O",
+    "Inactive — Caffeine":                   "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
 }
 
 
