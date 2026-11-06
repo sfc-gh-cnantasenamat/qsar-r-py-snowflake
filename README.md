@@ -17,6 +17,7 @@ A QSAR (quantitative structure-activity relationship) model, trained in R, predi
 data/        Cleaned ChEMBL1978 IC50 dataset (2,751 compounds) and fetch script
 docker/      R training script, Plumber API, Dockerfile, SPCS spec, model artifacts
 streamlit/   Multipage Streamlit app (Dashboard, Single and Batch Prediction, About)
+notebooks/   Workspace notebook: raw ChEMBL records to dashboard data on the stage
 native_app/  Optional Native App package for per-consumer MCP deployment
 scripts/     Endpoint smoke test and dashboard data generator
 sql/         Snowflake setup (role, warehouse, database, pool, repo, stage, log table)
