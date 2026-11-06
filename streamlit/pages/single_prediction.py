@@ -46,10 +46,10 @@ with st.container(border=True):
     st.markdown("")
 
     if input_method == "SMILES text":
-        if example_choice == "(none)":
-            st.session_state["smiles_field"] = ""
-        else:
+        # Only reset the field when the example selection changes, so typed input survives reruns
+        if active_smiles != st.session_state.get("_text_example", "__unset__"):
             st.session_state["smiles_field"] = active_smiles
+            st.session_state["_text_example"] = active_smiles
         smiles_input = st.text_input(
             "SMILES",
             key="smiles_field",

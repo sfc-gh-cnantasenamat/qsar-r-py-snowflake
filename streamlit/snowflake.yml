@@ -8,6 +8,10 @@ entities:
       name: QSAR_AROMATASE_APP
     main_file: app.py
     query_warehouse: QSAR_WH
+    runtime_name: SYSTEM$ST_CONTAINER_RUNTIME_PY3_11
+    compute_pool: QSAR_ST_POOL
+    external_access_integrations:
+      - QSAR_APP_EAI
     title: "QSAR Aromatase Inhibitor Predictor"
     artifacts:
       - app.py

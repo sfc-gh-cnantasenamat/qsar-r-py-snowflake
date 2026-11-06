@@ -32,6 +32,17 @@ CREATE COMPUTE POOL IF NOT EXISTS QSAR_CPU_POOL
 GRANT USAGE, MONITOR ON COMPUTE POOL QSAR_CPU_POOL TO ROLE QSAR_ROLE;
 GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE QSAR_ROLE;
 
+-- Separate small pool for the Streamlit container runtime.
+-- MAX_NODES = 2 leaves room for a new app instance while an old one shuts down.
+CREATE COMPUTE POOL IF NOT EXISTS QSAR_ST_POOL
+    MIN_NODES = 1
+    MAX_NODES = 2
+    INSTANCE_FAMILY = CPU_X64_XS
+    AUTO_RESUME = TRUE
+    AUTO_SUSPEND_SECS = 600
+    COMMENT = 'Streamlit container runtime for the QSAR app';
+GRANT USAGE, MONITOR ON COMPUTE POOL QSAR_ST_POOL TO ROLE QSAR_ROLE;
+
 -- ── 3. Stage, image repository, audit table ──────────────────────────────────
 USE ROLE QSAR_ROLE;
 USE WAREHOUSE QSAR_WH;
@@ -59,7 +70,22 @@ CREATE TABLE IF NOT EXISTS QSAR_PREDICTIONS_LOG (
 )
 COMMENT = 'Audit trail of predictions made from the Streamlit app';
 
--- ── 4. Inference service (run after pushing the image) ───────────────────────
+-- ── 4. Egress for the Streamlit app ──────────────────────────────────────────
+-- PyPI installs rdkit and streamlit-jsme; PubChem serves optional name and
+-- structure-image lookups (this sends SMILES and InChIKeys outside Snowflake).
+CREATE NETWORK RULE IF NOT EXISTS QSAR_APP_EGRESS
+    TYPE = HOST_PORT
+    MODE = EGRESS
+    VALUE_LIST = ('pypi.org', 'files.pythonhosted.org', 'pubchem.ncbi.nlm.nih.gov');
+
+USE ROLE ACCOUNTADMIN;
+CREATE EXTERNAL ACCESS INTEGRATION IF NOT EXISTS QSAR_APP_EAI
+    ALLOWED_NETWORK_RULES = (QSAR_DB.PUBLIC.QSAR_APP_EGRESS)
+    ENABLED = TRUE;
+GRANT USAGE ON INTEGRATION QSAR_APP_EAI TO ROLE QSAR_ROLE;
+USE ROLE QSAR_ROLE;
+
+-- ── 5. Inference service (run after pushing the image) ───────────────────────
 -- CREATE SERVICE QSAR_PLUMBER_SVC
 --     IN COMPUTE POOL QSAR_CPU_POOL
 --     FROM SPECIFICATION $$

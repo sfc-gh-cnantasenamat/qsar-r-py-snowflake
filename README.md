@@ -64,6 +64,7 @@ This is a teaching example, not a validated drug discovery model.
 - **Quantiles are not calibrated intervals.** The 5th to 95th percentile range from the quantile forest is labelled "90% CI" in API output but has not been calibrated.
 - **No applicability domain check.** Ethanol receives pIC50 5.11 instead of being flagged as out of domain.
 - **Scaffold gaps.** Exemestane, a potent steroidal inhibitor, is predicted 6.21 (Inactive), suggesting weak coverage of steroid scaffolds.
+- **Audit identity.** In Streamlit in Snowflake, `QSAR_PREDICTIONS_LOG.USER_NAME` records the app's service user, not the viewer.
 - **External lookups.** `streamlit/_shared.py` sends SMILES (structure image fallback) and InChIKeys (name lookup) to PubChem. Disable these before entering proprietary structures. In Streamlit in Snowflake they also require an external access integration.
 
 ## Data

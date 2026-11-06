@@ -21,7 +21,9 @@ except (ImportError, OSError):
 from rdkit.Chem.inchi import MolToInchi, InchiToInchiKey
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-_STAGE = "@QSAR_DB.PUBLIC.QSAR_STAGE"
+# Database and schema holding the stage and audit table; change if you used other names
+_DB_SCHEMA = "QSAR_DB.PUBLIC"
+_STAGE = f"@{_DB_SCHEMA}.QSAR_STAGE"
 
 EXAMPLES = {
     "Active — Letrozole analogue": "N#Cc1ccnc(Cc2ccc(C3=NN=C(c4ccc(F)cc4)N3)cc2)c1",
@@ -31,18 +33,25 @@ EXAMPLES = {
 }
 
 
+def _secret(*path, default=None):
+    """Read a nested Streamlit secret; Streamlit in Snowflake has no secrets.toml, so missing is normal."""
+    try:
+        node = st.secrets
+        for key in path:
+            node = node[key]
+        return node
+    except Exception:
+        return default
+
+
 def get_predict_url() -> str:
-    return st.secrets.get("spcs", {}).get(
-        "predict_url",
-        "http://qsar-plumber-svc.<hash>.svc.spcs.internal:5000/predict",
-    )
+    return _secret("spcs", "predict_url",
+                   default="http://qsar-plumber-svc.<hash>.svc.spcs.internal:5000/predict")
 
 
 def get_spcs_token() -> str:
-    return (
-        st.secrets.get("spcs", {}).get("token")
-        or st.secrets.get("connections", {}).get("snowflake", {}).get("password", "")
-    )
+    # Only needed when calling the public ingress URL from outside Snowflake
+    return _secret("spcs", "token") or _secret("connections", "snowflake", "password", default="")
 
 
 def _create_session():
@@ -164,7 +173,7 @@ def log_prediction(smiles: str, pred: dict):
     safe_smiles = smiles.replace("'", "''").replace("\\", "")[:4000]
     try:
         session.sql(
-            f"INSERT INTO QSAR_DB.PUBLIC.QSAR_PREDICTIONS_LOG "
+            f"INSERT INTO {_DB_SCHEMA}.QSAR_PREDICTIONS_LOG "
             f"(INPUT_SMILES, PREDICTED_PIC50, ACTIVITY_CLASS) "
             f"VALUES ('{safe_smiles}', {pred['pic50']:.6f}, '{pred['activity']}')"
         ).collect()

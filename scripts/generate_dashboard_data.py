@@ -22,9 +22,12 @@ import toml, pathlib
 PROJECT_ROOT   = pathlib.Path(__file__).parent.parent
 CLEANED_CSV    = PROJECT_ROOT / "data" / "chembl1978_cleaned.csv"
 # Public ingress URL from: SHOW ENDPOINTS IN SERVICE QSAR_DB.PUBLIC.QSAR_PLUMBER_SVC
-PREDICT_URL    = os.environ["QSAR_ENDPOINT"].rstrip("/") + "/predict"
+_ENDPOINT      = os.environ["QSAR_ENDPOINT"].rstrip("/")
+if not _ENDPOINT.startswith("http"):
+    _ENDPOINT = "https://" + _ENDPOINT
+PREDICT_URL    = _ENDPOINT + "/predict"
 BATCH_SIZE     = 50   # compounds per /predict call
-STAGE          = "@QSAR_DB.PUBLIC.QSAR_STAGE"
+STAGE          = os.environ.get("QSAR_STAGE", "@QSAR_DB.PUBLIC.QSAR_STAGE")
 
 # ── Snowflake auth ─────────────────────────────────────────────────────────────
 CONNECTION     = os.environ.get("SNOWFLAKE_CONNECTION", "default")
@@ -164,4 +167,4 @@ for fname in files:
     print(f"  Uploaded: {fname}")
 conn.close()
 
-print("\nDone — confirm with: LIST @QSAR_DB.PUBLIC.QSAR_STAGE")
+print(f"\nDone — confirm with: LIST {STAGE}")
