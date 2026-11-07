@@ -63,7 +63,7 @@ Configure any MCP-compatible client (Claude Desktop, CoCo Desktop, etc.):
 
 **Example agent interaction**:
 > *"Is Anastrozole likely to inhibit aromatase?"*  
-> Agent calls `predict_pic50("Cc1cc(Cc2cnc(C(C)(C)C#N)cc2)cnc1C(C)(C)C#N")`  
+> Agent calls `predict_pic50("CC(C)(C#N)c1cc(Cn2cncn2)cc(c1)C(C)(C)C#N")`  
 > Returns pIC50 and activity classification with confidence interval
 
 ## Semantic layer (Apache Ossie)

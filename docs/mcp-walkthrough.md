@@ -253,9 +253,9 @@ Once connected, ask the agent natural-language questions. The agent will call th
 
 ### Single compound prediction
 
-> *"What is the predicted aromatase inhibition activity of anastrozole? SMILES: `Cc1cc(Cc2cnc(C(C)(C)C#N)cc2)cnc1C(C)(C)C#N`"*
+> *"What is the predicted aromatase inhibition activity of anastrozole? SMILES: `CC(C)(C#N)c1cc(Cn2cncn2)cc(c1)C(C)(C)C#N`"*
 
-> *"Predict the IC50 of letrozole against CYP19A1. SMILES: `N#Cc1ccc(Cc2ccc(C#N)cc2)cc1`"*
+> *"Predict the IC50 of letrozole against CYP19A1. SMILES: `N#Cc1ccc(cc1)C(n1cncn1)c1ccc(C#N)cc1`"*
 
 > *"Is this compound an active aromatase inhibitor? `c1ccc2c(c1)CC(=O)O2`"*
 
@@ -301,7 +301,7 @@ Once connected, ask the agent natural-language questions. The agent will call th
 
 > *"Validate this SMILES, predict its aromatase activity, and tell me whether it is drug-like according to Ro5: `COc1ccc2c(c1)CCC(=O)O2`"*
 
-> *"Compare the predicted pIC50 of estradiol (`OC1CC2CCC3c4ccc(O)cc4CCC3C2(C)C1`) against the model's average test performance."*
+> *"Compare the predicted pIC50 of estradiol (`C[C@]12CC[C@H]3[C@@H](CCc4cc(O)ccc34)[C@@H]1CC[C@@H]2O`) against the model's average test performance."*
 
 > *"What are the most important fingerprint bits, and how does the model perform on the test set?"*
 

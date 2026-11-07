@@ -128,7 +128,7 @@ This is a teaching example, not a validated drug discovery model.
 - **One split, order-dependent.** The 80/20 split is drawn by row position with a fixed seed, so the same compounds in a different row order give different metrics. Training on notebook 01's output gives test R2 0.6537 and RMSE 0.7949; the bundled model, trained on the `data/` snapshot, gives 0.6855 and 0.7708. Cross-validation would give a more stable estimate.
 - **Quantiles are not calibrated intervals.** The 5th to 95th percentile range from the quantile forest is labelled "90% CI" in API output but has not been calibrated.
 - **No applicability domain check.** Ethanol receives pIC50 5.11 instead of being flagged as out of domain.
-- **Scaffold gaps.** Exemestane, a potent steroidal inhibitor, is predicted 6.21 (Inactive), suggesting weak coverage of steroid scaffolds.
+- **Held-out misses on known drugs.** Exemestane (measured pIC50 7.82) is in the held-out test set when you train on notebook 01's output and is predicted 6.21 (Inactive). The bundled model, whose training set includes exemestane, predicts 7.00. Steroids make up 682 of 2,751 compounds but are only 31% active, against 39% overall.
 - **Audit identity.** In Streamlit in Snowflake, `QSAR_PREDICTIONS_LOG.USER_NAME` records the app's service user, not the viewer.
 - **External lookups.** `streamlit/_shared.py` sends SMILES (structure image fallback) and InChIKeys (name lookup) to PubChem. Disable these before entering proprietary structures. In Streamlit in Snowflake they also require an external access integration.
 

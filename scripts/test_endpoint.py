@@ -26,7 +26,7 @@ HEADERS = {
 COMPOUNDS = {
     "letrozole":   "N#Cc1ccc(cc1)C(n1cncn1)c1ccc(C#N)cc1",
     "anastrozole": "CC(C)(C#N)c1cc(Cn2cncn2)cc(c1)C(C)(C)C#N",
-    "exemestane":  "C=C1CC2=CC(=O)C=CC2(C)C2CCC3(C)C(=O)CCC3C12",
+    "exemestane":  "C[C@]12CC[C@H]3[C@@H](CC(=C)C4=CC(=O)C=C[C@]34C)[C@@H]1CCC2=O",
     "ethanol":     "CCO",
     "invalid":     "not_a_smiles",
 }
