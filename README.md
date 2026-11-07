@@ -1,6 +1,6 @@
 # AromatasePred: R-Powered Drug Discovery on Snowflake
 
-Companion repository for the Snowflake developer guide **Build an R-Powered Drug Discovery App with Snowpark Container Services**.
+Companion repository for the Snowflake developer guide **Build an R and Python Powered Drug Discovery App on Snowflake**.
 
 A QSAR (quantitative structure-activity relationship) model, trained in R, predicts how strongly a molecule inhibits human aromatase (CYP19A1, ChEMBL1978), a breast cancer drug target. R does the cheminformatics and modelling; Python curates the data and serves the interface:
 
