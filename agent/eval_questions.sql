@@ -1,4 +1,5 @@
--- Run only in the isolated test schema while developing the agent.
+-- Optional evaluation fixture. Run in your own guide schema after reviewing
+-- the bundled-model expected values. This script replaces AGENT_EVAL_QUESTIONS.
 USE ROLE QSAR_ROLE;
 USE WAREHOUSE QSAR_WH;
 USE SCHEMA QSAR_DB.PUBLIC;

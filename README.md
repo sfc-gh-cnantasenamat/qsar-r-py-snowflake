@@ -37,7 +37,13 @@ The developer guide walks through each step in detail.
    USE WAREHOUSE QSAR_WH;
    USE SCHEMA QSAR_DB.PUBLIC;
    CREATE STAGE IF NOT EXISTS NB_PROJECT_STAGE;
-   -- snow sql -q "PUT file://notebooks/*.ipynb @QSAR_DB.PUBLIC.NB_PROJECT_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE"
+   ```
+   From the repository root in a terminal (not a SQL worksheet):
+   ```bash
+   snow sql -q "PUT file://notebooks/*.ipynb @QSAR_DB.PUBLIC.NB_PROJECT_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE"
+   ```
+   Back in the worksheet:
+   ```sql
    CREATE OR REPLACE NOTEBOOK PROJECT QSAR_NOTEBOOKS FROM '@NB_PROJECT_STAGE';
    EXECUTE NOTEBOOK PROJECT QSAR_NOTEBOOKS
        MAIN_FILE = '01_prepare_training_data.ipynb'
@@ -101,6 +107,8 @@ The developer guide walks through each step in detail.
 
 This section documents an isolated `QSAR_AG_*` prototype, not a feature of the current live `QSAR_DB` service or app. Deploying these optional objects to `QSAR_DB` and updating the live app require a separate rollout decision.
 
+The local bundled-model shortcut produces dashboard CSVs, not Snowflake tables. Before following this optional section, run notebook 01, `sql/functions.sql`, and notebook 02 even if you served the bundled model. They create the compound, assay, publication, prediction, fingerprint, and descriptor tables that the agent requires.
+
 Notebook 01 also fetches 313 assay descriptions and 198 publication records. Notebook 02 writes per-molecule predictions, full CDK fingerprints, and Rule of Five descriptors. After the core flow, run `sql/agent.sql` to create the `AROMATASE_SV` semantic view, `ASSAY_SEARCH` Cortex Search service and `TRIAGE_COMPOUNDS` procedure. The agent DDL is generated from `agent/aromatase_agent.yaml`:
 
 ```bash
@@ -109,9 +117,9 @@ python scripts/deploy_agent.py --connection <your_connection>
 
 This grants `QSAR_ROLE` invocation access and adds `AROMATASE_AGENT` to Snowflake Intelligence. The Streamlit **Ask an Agent** page appears when the app's Snowflake session can see the agent. It uses Analyst for measured data, Search for assay/publication text, and the R-backed functions for prediction, similarity and explanation. A triage call accepts at most 20 SMILES, one per line. Similarity searches all measured compounds, including held-out rows, so it is not a validated applicability-domain estimate. Explanations use global regression impurity importance for bits present in a SMILES, not causal or local attributions.
 
-The 15-question evaluation fixtures and YAML are in `agent/eval_questions.sql` and `agent/eval_config.yaml`. Their expected predictions refer to the **bundled model**, so update the ground truth after retraining on notebook output. Run the SQL, stage the YAML, then start and inspect a Cortex Agent evaluation with `EXECUTE_AI_EVALUATION`. For repeat runs on the same dataset, remove the `dataset` block from the staged YAML and choose a new run name. In the isolated prototype, all 15 cases completed with mean answer correctness 0.956, logical consistency 0.956, and tool selection 0.967; those scores are not predictive-model accuracy. These optional components incur Cortex and Cortex Search costs.
+The 15-question evaluation fixtures and YAML are in `agent/eval_questions.sql` and `agent/eval_config.yaml`. Their expected predictions refer to the **bundled model**, so update the ground truth after retraining on notebook output. Run the SQL, stage the YAML, then start and inspect a Cortex Agent evaluation with `EXECUTE_AI_EVALUATION`. For repeat runs on the same dataset, remove the `dataset` block from the staged YAML and choose a new run name. In the isolated prototype, all 15 cases completed with mean answer correctness 0.956, logical consistency 0.956, and tool selection 0.967; those scores are not predictive-model accuracy. These optional components incur Cortex and Cortex Search costs. The guide contains the commands for running and checking the evaluation.
 
-To skip steps 2 and 3, build the image from the bundled model in `docker/`, which was trained on the snapshot in `data/`. In that case, generate the dashboard data from a laptop with `scripts/generate_dashboard_data.py`, which reads `data/chembl1978_cleaned.csv` and calls the public endpoint with a PAT.
+To skip steps 2 and 3, build the image from the bundled model in `docker/`, which was trained on the snapshot in `data/`. In that case, install `requests pandas toml snowflake-connector-python 'rdkit==2025.09.3'` in your Python 3.11 environment and generate dashboard data from a laptop with `scripts/generate_dashboard_data.py`, which reads `data/chembl1978_cleaned.csv` and calls the public endpoint with a PAT. To add the optional agent later, run both notebooks as described above.
 
 ## Clean up
 
