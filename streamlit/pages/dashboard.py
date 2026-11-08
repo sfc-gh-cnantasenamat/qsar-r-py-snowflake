@@ -182,13 +182,14 @@ if not eda_df.empty:
         # preserve consistent zone order
         counts["_order"] = counts["Activity"].map({"Active": 0, "Intermediate": 1, "Inactive": 2})
         counts = counts.sort_values("_order").drop(columns="_order")
+        count_max = max(1, int(counts["Count"].max() * 1.25)) if not counts.empty else 1
         bar = (
             alt.Chart(counts)
             .mark_bar(cornerRadiusTopRight=4, cornerRadiusBottomRight=4)
             .encode(
                 alt.Y("Activity:N", sort=_ZONE_DOMAIN, title=None),
                 alt.X("Count:Q", title="Compounds",
-                      scale=alt.Scale(domain=[0, int(counts["Count"].max() * 1.25)])),
+                       scale=alt.Scale(domain=[0, count_max])),
                 alt.Color("Activity:N",
                           scale=alt.Scale(domain=_filt_domain, range=_filt_range),
                           legend=None),
@@ -366,7 +367,7 @@ if not pred_df.empty:
         else:
             pic50_domain = [3, 12]
             diag_data    = pd.DataFrame({"x": pic50_domain, "y": pic50_domain})
-            st.markdown("**Actual vs Predicted pIC50 (Test)**")
+            st.markdown("**Actual vs Predicted pIC50 (training and test combined)**")
             scatter2 = (
                 alt.Chart(pred_plot)
                 .mark_circle(size=35, opacity=0.85)
@@ -431,7 +432,7 @@ if not feat_df.empty:
             alt.Chart(feat_df)
             .mark_bar()
             .encode(
-                alt.X("importance:Q", title="Gini importance"),
+                alt.X("importance:Q", title="Regression impurity importance"),
                 alt.Y("bit:N", sort="-x", title="ECFP4 bit"),
                 alt.Color("importance:Q",
                           scale=alt.Scale(range=["#fce4ec", "#e040fb"]),
@@ -452,10 +453,11 @@ if not feat_df.empty:
             )
         with st.expander("Reading the chart"):
             st.markdown(
-                "Gini importance (mean decrease in node impurity) measures "
-                "how much a bit reduces prediction uncertainty when the Random "
+                "Regression impurity importance (mean decrease in variance) measures "
+                "how much a bit reduces training-set variance when the Random "
                 "Forest splits on it. A higher bar = that structural fragment "
-                "is more predictive of pIC50 across all 500 trees."
+                "was more useful for splitting the training data across all 500 trees. "
+                "It is not a local contribution to any one prediction."
             )
         with st.expander("Aromatase inhibitor pharmacophore"):
             st.markdown(

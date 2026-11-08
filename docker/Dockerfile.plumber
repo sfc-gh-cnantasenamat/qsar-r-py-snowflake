@@ -43,6 +43,7 @@ RUN Rscript -e " \
 COPY qsar_aromatase_model.rds /model/qsar_aromatase_model.rds
 COPY kept_bits.csv             /model/kept_bits.csv
 COPY training_metrics.json     /model/training_metrics.json
+COPY train_fingerprints.csv    /model/train_fingerprints.csv
 
 # ── API ───────────────────────────────────────────────────────────────────────
 COPY plumber_api.R /api/plumber_api.R

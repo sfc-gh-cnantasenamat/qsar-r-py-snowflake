@@ -33,6 +33,8 @@ CREATE COMPUTE POOL IF NOT EXISTS QSAR_CPU_POOL
     COMMENT = 'QSAR aromatase SPCS inference';
 GRANT USAGE, MONITOR ON COMPUTE POOL QSAR_CPU_POOL TO ROLE QSAR_ROLE;
 GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE QSAR_ROLE;
+-- Lets the RO5() function in functions.sql install an exact RDKit version from PyPI
+GRANT DATABASE ROLE SNOWFLAKE.PYPI_REPOSITORY_USER TO ROLE QSAR_ROLE;
 
 -- Separate small pool for the Streamlit container runtime.
 -- MAX_NODES = 2 leaves room for a new app instance while an old one shuts down.

@@ -8,7 +8,7 @@ Provides an MCP tool `predict_pic50(smiles)` that returns:
 
 - Predicted **pIC50** (−log₁₀ IC₅₀ [M])
 - **Activity class** (Active if pIC50 ≥ 6.5)
-- **90% confidence interval** from ranger quantile regression
+- **Uncalibrated 5th to 95th model quantiles** from ranger quantile regression
 - Approximate **IC50 in nM**
 
 ## Model
@@ -59,12 +59,12 @@ Configure any MCP-compatible client (Claude Desktop, CoCo Desktop, etc.):
 ### Available tool: `predict_pic50`
 
 **Input**: `smiles` (string) — canonical SMILES notation  
-**Output**: pIC50, activity class, 90% CI, approximate IC50 in nM
+**Output**: pIC50, activity class, uncalibrated quantile range, approximate IC50 in nM
 
 **Example agent interaction**:
 > *"Is Anastrozole likely to inhibit aromatase?"*  
 > Agent calls `predict_pic50("CC(C)(C#N)c1cc(Cn2cncn2)cc(c1)C(C)(C)C#N")`  
-> Returns pIC50 and activity classification with confidence interval
+> Returns pIC50 and activity classification with an uncalibrated quantile range
 
 ## Semantic layer (Apache Ossie)
 

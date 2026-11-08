@@ -112,6 +112,10 @@ for start in range(0, len(smiles_list), BATCH_SIZE):
             r.raise_for_status()
             data = r.json().get("data", [])
             # data rows: [idx, pic50, activity, ci_lo, ci_hi]
+            if (len(data) != len(batch) or
+                    sorted(row[0] for row in data) != list(range(len(batch))) or
+                    any(len(row) < 5 or not isinstance(row[1], (int, float)) for row in data)):
+                raise ValueError("Incomplete or malformed prediction batch")
             data_sorted = sorted(data, key=lambda x: x[0])
             pred_list.extend([row[1] for row in data_sorted])
             break

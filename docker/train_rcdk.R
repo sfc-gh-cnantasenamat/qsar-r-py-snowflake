@@ -82,6 +82,15 @@ imp_df <- data.frame(bit = names(imp), importance = imp)
 imp_df <- imp_df[order(-imp_df$importance), ]
 write.csv(head(imp_df, 20), "/output/top_features_rcdk.csv", row.names = FALSE)
 
+# Full ECFP4 bits per measured compound, including held-out rows
+write.csv(data.frame(
+  molecule_chembl_id = df$molecule_chembl_id,
+  canonical_smiles   = df$canonical_smiles,
+  pchembl_value      = df$pchembl_value,
+  activity_class     = df$activity_class,
+  ecfp4_bits         = vapply(fps, function(v) paste(which(v == 1L), collapse = ";"), character(1))
+), "/output/train_fingerprints.csv", row.names = FALSE)
+
 metrics <- list(
   oob_r2      = round(model$r.squared, 4),
   test_r2     = round(r2, 4),

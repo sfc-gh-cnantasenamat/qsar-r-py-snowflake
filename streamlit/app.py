@@ -4,7 +4,7 @@ Initialises the Snowflake session and routes to pages.
 """
 
 import streamlit as st
-from _shared import init_session
+from _shared import _DB_SCHEMA, init_session
 
 st.set_page_config(
     page_title="QSAR Aromatase Predictor",
@@ -13,7 +13,14 @@ st.set_page_config(
 )
 
 # Initialise Snowflake session once per browser session
-init_session()
+session = init_session()
+
+try:
+    agent_available = bool(session.sql(
+        f"SHOW AGENTS LIKE 'AROMATASE_AGENT' IN SCHEMA {_DB_SCHEMA}"
+    ).collect())
+except Exception:
+    agent_available = False
 
 _ALL_CLASSES = ["Active", "Intermediate", "Inactive"]
 
@@ -39,13 +46,13 @@ with st.sidebar:
         )
 
 # ── Navigation ─────────────────────────────────────────────────────────────────
-pg = st.navigation(
-    [
-        st.Page("pages/dashboard.py",         title="Dashboard",         icon=":material/dashboard:"),
-        st.Page("pages/single_prediction.py", title="Single Prediction", icon=":material/biotech:"),
-        st.Page("pages/batch_prediction.py",  title="Batch Prediction",  icon=":material/table:"),
-        st.Page("pages/about.py",             title="About",             icon=":material/info:"),
-    ],
-    position="top",
-)
+pages = [
+    st.Page("pages/dashboard.py",         title="Dashboard",         icon=":material/dashboard:"),
+    st.Page("pages/single_prediction.py", title="Single Prediction", icon=":material/biotech:"),
+    st.Page("pages/batch_prediction.py",  title="Batch Prediction",  icon=":material/table:"),
+]
+if agent_available:
+    pages.append(st.Page("pages/ask_agent.py", title="Ask an Agent", icon=":material/forum:"))
+pages.append(st.Page("pages/about.py", title="About", icon=":material/info:"))
+pg = st.navigation(pages, position="top")
 pg.run()

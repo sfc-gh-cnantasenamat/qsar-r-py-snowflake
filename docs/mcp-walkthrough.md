@@ -10,11 +10,11 @@ Two MCP endpoints are available. Use **Standalone** for immediate access with a 
 
 The QSAR Aromatase MCP server exposes a ranger Random Forest QSAR model trained on 2,751 ChEMBL aromatase (CYP19A1) inhibitors. Once connected to an AI agent, the agent can:
 
-- **Predict** aromatase inhibition activity (pIC50, IC50, activity class, 90% confidence interval) for any molecule given as a SMILES string
+- **Predict** aromatase inhibition activity (pIC50, IC50, activity class, uncalibrated 5th to 95th model quantiles) for any molecule given as a SMILES string
 - **Validate** SMILES strings before running predictions
 - **Explore the dataset** — compound counts, train/test split, class balance, pIC50 range
 - **Query model performance** — test R², RMSE, fingerprint type, number of trees and features
-- **Rank important features** — top ECFP4 fingerprint bits by Gini importance
+- **Rank important features** — top ECFP4 fingerprint bits by regression impurity importance
 - **Check Ro5 compliance** — Lipinski Rule of Five statistics by activity class
 
 ### Prerequisites
@@ -222,13 +222,13 @@ Returns statistics about the ChEMBL1978 training dataset — no arguments requir
 
 ### `get_feature_importance`
 
-Returns the top N most important ECFP4 bits by Gini importance.
+Returns the top N most important ECFP4 bits by regression impurity importance.
 
 | Parameter | Type    | Required | Description                        |
 |-----------|---------|----------|------------------------------------|
 | `n`       | integer | no       | Number of features to return (default 10, max 20) |
 
-**Output:** ranked list of `{ rank, bit, importance }` objects. Importance = mean decrease in node impurity (Gini criterion).
+**Output:** ranked list of `{ rank, bit, importance }` objects. Importance = mean decrease in regression impurity (variance), not a Gini classification criterion.
 
 ---
 
@@ -285,7 +285,7 @@ Once connected, ask the agent natural-language questions. The agent will call th
 
 > *"Which ECFP4 fingerprint bits are most predictive of aromatase inhibition?"*
 
-> *"Show me the top 10 features ranked by Gini importance."*
+> *"Show me the top 10 features ranked by regression impurity importance."*
 
 > *"Which structural substructures drive the model's predictions most?"*
 

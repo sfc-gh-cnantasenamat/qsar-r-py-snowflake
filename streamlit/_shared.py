@@ -46,8 +46,20 @@ def _secret(*path, default=None):
 
 
 def get_predict_url() -> str:
-    return _secret("spcs", "predict_url",
-                   default="http://qsar-plumber-svc.<hash>.svc.spcs.internal:5000/predict")
+    """Use an explicit local URL or discover the in-account service endpoint."""
+    configured = _secret("spcs", "predict_url")
+    if configured:
+        return configured
+    if not running_in_snowflake():
+        raise RuntimeError("Configure spcs.predict_url in Streamlit secrets for local use")
+    session = init_session()
+    services = session.sql(f"SHOW SERVICES LIKE 'QSAR_PLUMBER_SVC' IN SCHEMA {_DB_SCHEMA}").collect()
+    if not services:
+        raise RuntimeError(f"QSAR_PLUMBER_SVC not found in {_DB_SCHEMA}")
+    dns_name = services[0].as_dict().get("dns_name")
+    if not dns_name:
+        raise RuntimeError("Service DNS name is unavailable; configure spcs.predict_url")
+    return f"http://{dns_name}:5000/predict"
 
 
 def get_spcs_token() -> str:
@@ -90,8 +102,8 @@ def init_session():
 
 # ── Chemistry helpers ─────────────────────────────────────────────────────────
 
-def smiles_to_image(smiles: str):
-    """Return PNG bytes of the 2D structure. Uses RDKit if available, else PubChem."""
+def smiles_to_image(smiles: str, allow_external: bool = False):
+    """Render locally with RDKit; only use PubChem fallback with explicit opt-in."""
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
@@ -104,6 +116,8 @@ def smiles_to_image(smiles: str):
             return buf.getvalue()
         except Exception:
             pass
+    if not allow_external:
+        return None
     try:
         resp = requests.get(
             "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/PNG",

@@ -17,10 +17,10 @@ st.markdown(
 st.subheader("Dataset")
 st.markdown("""
 - Source: **ChEMBL1978** — curated IC₅₀ bioactivity records for CYP19A1
-- 2,751 compounds after deduplication by InChI key and removal of ambiguous
-  assay entries
+- 2,751 compounds after filtering exact binding-assay IC₅₀ values and
+  retaining the highest pIC50 per ChEMBL molecule ID
 - pIC50 = −log₁₀(IC₅₀ [M]) used as the continuous regression target
-- Train / test split: 80 / 20 stratified by activity class (pIC50 ≥ 6.5)
+- Train / test split: 80 / 20 partitioned on continuous pIC50 values using a fixed seed
 """)
 
 st.subheader("Fingerprints")
@@ -48,7 +48,7 @@ st.markdown(f"""
   predicting arbitrary quantiles rather than just the mean
 - **Inference:** `predict(model, data, type = "quantiles", quantiles = c(0.05, 0.5, 0.95))`
   returns the 5th, 50th (median pIC50), and 95th percentiles in one pass,
-  giving the prediction and its 90 % confidence interval simultaneously
+  giving the prediction and uncalibrated 5th to 95th model quantiles simultaneously
 - **Performance:** {performance}
 - **Serving:** the trained model (`.rds`) and `kept_bits.csv` are baked into
   the Docker image at build time; a `plumber` REST API exposes `/predict` and

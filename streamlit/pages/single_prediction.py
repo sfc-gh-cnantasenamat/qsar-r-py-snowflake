@@ -20,7 +20,7 @@ st.title(":material/biotech: Single Prediction")
 st.caption(
     ("Type" if running_in_snowflake() else "Draw or type")
     + " a SMILES string to predict the pIC50 and "
-    "90% confidence interval for a single compound."
+    "uncalibrated 5th to 95th quantile range for a single compound."
 )
 
 # ── Input container ───────────────────────────────────────────────────────────
@@ -76,8 +76,16 @@ with st.container(border=True):
 if predict_btn and smiles_input:
     with st.spinner("Running prediction…"):
         pred = predict_pic50(smiles_input.strip())
-
+    st.session_state["single_prediction_result"] = (
+        {"smiles": smiles_input.strip(), "prediction": pred} if pred else None
+    )
     if pred and pred["pic50"] is not None:
+        log_prediction(smiles_input.strip(), pred)
+
+saved_result = st.session_state.get("single_prediction_result")
+if saved_result and saved_result["smiles"] == smiles_input.strip():
+    pred = saved_result["prediction"]
+    if pred["pic50"] is not None:
         pic50  = pred["pic50"]
         ci_lo  = pred["ci_lo"]
         ci_hi  = pred["ci_hi"]
@@ -104,19 +112,25 @@ if predict_btn and smiles_input:
 
                 with col_struct:
                     st.markdown("#### Compound")
-                    mol_img = smiles_to_image(smiles_input.strip())
+                    mol_img = smiles_to_image(smiles_input.strip(), allow_external=False)
                     if mol_img:
                         st.image(mol_img)
-                    names = smiles_to_names(smiles_input.strip())
-                    if names["common"] or names["iupac"]:
-                        if names["common"]:
-                            st.markdown("**Common name**")
-                            st.badge(names["common"], color="blue")
-                        if names["iupac"]:
-                            st.markdown("**IUPAC name**")
-                            st.badge(names["iupac"], color="violet")
-                    else:
-                        st.caption("Name not found in PubChem")
+                    if st.checkbox("Look up name and image on PubChem", value=False,
+                                   help="Sends this molecular structure to PubChem outside Snowflake."):
+                        names = smiles_to_names(smiles_input.strip())
+                        if names["common"] or names["iupac"]:
+                            if names["common"]:
+                                st.markdown("**Common name**")
+                                st.badge(names["common"], color="blue")
+                            if names["iupac"]:
+                                st.markdown("**IUPAC name**")
+                                st.badge(names["iupac"], color="violet")
+                        else:
+                            st.caption("Name not found in PubChem")
+                        if not mol_img:
+                            external_image = smiles_to_image(smiles_input.strip(), allow_external=True)
+                            if external_image:
+                                st.image(external_image)
                     st.markdown(f"**SMILES:** `{smiles_input}`")
 
                 with col_result:
@@ -129,9 +143,9 @@ if predict_btn and smiles_input:
                     # Narrative caption above CI chart
                     if ci_lo is not None and ci_hi is not None:
                         if show_ic50 and ic50_ci_lo is not None:
-                            st.caption(f"The model estimates the IC\u2085\u2080 lies between {ic50_ci_lo:,.1f} nM and {ic50_ci_hi:,.1f} nM with 90% confidence.")
+                            st.caption(f"Uncalibrated 5th to 95th model quantiles: {ic50_ci_lo:,.1f} to {ic50_ci_hi:,.1f} nM. Not a confidence interval.")
                         else:
-                            st.caption(f"The model estimates the pIC50 lies between {ci_lo:.2f} and {ci_hi:.2f} with 90% confidence.")
+                            st.caption(f"Uncalibrated 5th to 95th model quantiles: pIC50 {ci_lo:.2f} to {ci_hi:.2f}. Not a confidence interval.")
 
                     # CI range chart
                     if ci_lo is not None and ci_hi is not None:
@@ -197,5 +211,3 @@ if predict_btn and smiles_input:
                         st.warning(f"**{act}**")
                     else:
                         st.error(f"**{act}**")
-
-        log_prediction(smiles_input.strip(), pred)

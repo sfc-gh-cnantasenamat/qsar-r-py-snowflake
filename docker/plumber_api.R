@@ -24,7 +24,11 @@ kept_bits <- read.csv("/model/kept_bits.csv")$bit
 n_bits    <- length(kept_bits)
 # Metrics written by train_rcdk.R for this model; reported by the MCP tools
 metrics   <- jsonlite::read_json("/model/training_metrics.json")
+# All measured compounds (training and held-out) with full ECFP4 bits
+train_fp  <- read.csv("/model/train_fingerprints.csv", stringsAsFactors = FALSE)
+train_fp$bits <- lapply(strsplit(train_fp$ecfp4_bits, ";", fixed = TRUE), as.integer)
 cat(sprintf("  ranger model: %d trees, %d features\n", model$num.trees, n_bits))
+cat(sprintf("  training fingerprints: %d compounds\n", nrow(train_fp)))
 
 # ── Pre-warm rcdk JVM (avoids cold-start latency on first request) ────────────
 cat("Warming up rcdk JVM...\n")
@@ -65,6 +69,45 @@ cat("Plumber API ready — listening on port 5000\n")
 
   list(pic50 = pic50, activity = label, ci_lo = ci_lo, ci_hi = ci_hi,
        ic50_nm = ic50_nm)
+}
+
+# ── Fingerprint helpers (same CDK ECFP4 as training) ──────────────────────────
+.parse_or_null <- function(smiles) {
+  tryCatch(parse.smiles(smiles)[[1]], error = function(e) NULL)
+}
+
+# 1-based set bits, identical to get.fingerprint(type = "circular", circular.type = "ECFP4")@bits
+.ecfp4_bits <- function(mol) {
+  sort(get.fingerprint(mol, type = "circular", circular.type = "ECFP4",
+                       depth = 2, size = 1024)@bits)
+}
+
+# One row per atom environment: model bit, radius, and the substructure as SMILES.
+# Bit = (environment hash mod 1024) + 1, which reproduces rcdk's bits for every training compound.
+.ecfp4_environments <- function(mol) {
+  ac <- .jcast(mol, "org/openscience/cdk/interfaces/IAtomContainer")
+  cf <- .jnew("org/openscience/cdk/fingerprint/CircularFingerprinter", 3L)
+  .jcall(cf, "Lorg/openscience/cdk/fingerprint/IBitFingerprint;", "getBitFingerprint", ac)
+  sg <- .jnew("org/openscience/cdk/smiles/SmilesGenerator",
+              .jfield("org/openscience/cdk/smiles/SmiFlavor", "I", "Generic"))
+  n <- .jcall(cf, "I", "getFPCount")
+  do.call(rbind, lapply(seq_len(n) - 1L, function(i) {
+    f     <- .jcall(cf, "Lorg/openscience/cdk/fingerprint/CircularFingerprinter$FP;", "getFP", i)
+    atoms <- .jfield(f, "[I", "atoms")
+    sub   <- .jcall("org/openscience/cdk/tools/manipulator/AtomContainerManipulator",
+                    "Lorg/openscience/cdk/interfaces/IAtomContainer;", "extractSubstructure",
+                    ac, .jarray(as.integer(atoms)))
+    data.frame(bit = (.jfield(f, "I", "hashCode") %% 1024) + 1,
+               radius = .jfield(f, "I", "iteration"),
+               fragment = .jcall(sg, "S", "create", sub),
+               stringsAsFactors = FALSE)
+  }))
+}
+
+.tanimoto <- function(a, b) {
+  shared <- length(intersect(a, b))
+  if (shared == 0) return(0)
+  shared / (length(a) + length(b) - shared)
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,6 +164,96 @@ function(req) {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Service-function endpoints for SQL (CREATE FUNCTION ... SERVICE = ...)
+# Each row arrives as [row_index, args...] and returns [row_index, object].
+# ─────────────────────────────────────────────────────────────────────────────
+
+.sf_rows <- function(req) {
+  body <- tryCatch(jsonlite::fromJSON(rawToChar(req$bodyRaw), simplifyVector = FALSE),
+                   error = function(e) req$body)
+  body$data
+}
+
+.sf_apply <- function(req, fn) {
+  list(data = lapply(.sf_rows(req), function(row) {
+    out <- tryCatch(fn(row), error = function(e) list(error = conditionMessage(e)))
+    list(row[[1]], out)
+  }))
+}
+
+#* ECFP4 bits (1-based, same convention as training) for one SMILES
+#* @post /sf/fingerprint
+#* @serializer unboxedJSON
+function(req) {
+  .sf_apply(req, function(row) {
+    mol <- .parse_or_null(as.character(row[[2]]))
+    if (is.null(mol)) return(list(error = "Invalid SMILES"))
+    bits <- .ecfp4_bits(mol)
+    list(bits = as.list(bits), n_bits_on = length(bits))
+  })
+}
+
+#* pIC50 prediction as one object
+#* @post /sf/predict
+#* @serializer unboxedJSON
+function(req) {
+  .sf_apply(req, function(row) {
+    p <- .run_prediction(as.character(row[[2]]))
+    if (!is.null(p$error)) return(list(error = p$error))
+    list(pic50 = p$pic50, activity = p$activity, q05 = p$ci_lo, q95 = p$ci_hi, ic50_nm = p$ic50_nm)
+  })
+}
+
+#* Nearest measured compounds by Tanimoto similarity on ECFP4
+#* @post /sf/similar
+#* @serializer unboxedJSON
+function(req) {
+  .sf_apply(req, function(row) {
+    mol <- .parse_or_null(as.character(row[[2]]))
+    if (is.null(mol)) return(list(error = "Invalid SMILES"))
+    k <- if (length(row) >= 3 && !is.null(row[[3]])) max(1L, min(as.integer(row[[3]]), 20L)) else 5L
+    query <- .ecfp4_bits(mol)
+    sims <- vapply(train_fp$bits, function(b) .tanimoto(query, b), numeric(1))
+    top <- head(order(sims, decreasing = TRUE), k)
+    list(
+      max_tanimoto = round(sims[top[1]], 3),
+      neighbours = lapply(top, function(i) list(
+        molecule_chembl_id = train_fp$molecule_chembl_id[i],
+        tanimoto           = round(sims[i], 3),
+        pchembl_value      = train_fp$pchembl_value[i],
+        activity_class     = train_fp$activity_class[i],
+        canonical_smiles   = train_fp$canonical_smiles[i]
+      ))
+    )
+  })
+}
+
+#* Most important model features present in a molecule, mapped to substructures
+#* @post /sf/explain
+#* @serializer unboxedJSON
+function(req) {
+  .sf_apply(req, function(row) {
+    smiles <- as.character(row[[2]])
+    mol <- .parse_or_null(smiles)
+    if (is.null(mol)) return(list(error = "Invalid SMILES"))
+    n <- if (length(row) >= 3 && !is.null(row[[3]])) max(1L, min(as.integer(row[[3]]), 10L)) else 5L
+    envs <- .ecfp4_environments(mol)
+    imp  <- sort(model$variable.importance, decreasing = TRUE)
+    rank <- setNames(seq_along(imp), names(imp))
+    present <- intersect(names(imp), paste0("bit_", unique(envs$bit)))
+    features <- lapply(head(present, n), function(b) {
+      bit <- as.integer(sub("bit_", "", b))
+      e   <- envs[envs$bit == bit, ]
+      list(bit = b, importance_rank = unname(rank[b]), importance = round(unname(imp[b]), 3),
+           fragments = as.list(unique(e$fragment)), radius = unique(e$radius))
+    })
+    p <- .run_prediction(smiles)
+    list(pic50 = p$pic50, activity = p$activity, n_model_features = length(imp),
+         n_present = length(present), top_features = features)
+  })
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # MCP server — JSON-RPC 2.0, Streamable HTTP transport
 # Spec: https://spec.modelcontextprotocol.io/specification/2025-03-26/
 #
@@ -135,7 +268,7 @@ function(req) {
       "(CYP19A1) using a ranger Random Forest QSAR model trained on ChEMBL1978",
       "(2751 compounds, ECFP4 fingerprints, 500 trees, quantile regression).",
       "Returns predicted pIC50, activity classification (Active if pIC50 >= 6.5),",
-      "90% confidence interval, and approximate IC50 in nM.",
+      "uncalibrated 5th–95th model quantiles, and approximate IC50 in nM.",
       "Target: CYP19A1 (aromatase) — key enzyme in estrogen biosynthesis,",
       "relevant to breast cancer and other hormone-driven conditions."
     ),
@@ -204,7 +337,7 @@ function(req) {
     name = "get_feature_importance",
     description = paste(
       "Returns the top N most important ECFP4 fingerprint bits (features) ranked",
-      "by Gini importance from the Random Forest model.",
+      "by regression impurity importance from the Random Forest model.",
       "Useful for understanding which structural substructures drive aromatase",
       "inhibition predictions. Default n=10, maximum n=20."
     ),
@@ -446,7 +579,7 @@ function(req) {
       result <- list(
         n_returned    = length(rows),
         total_features = n_bits,
-        importance_type = "Gini (mean decrease in node impurity)",
+        importance_type = "Regression impurity (mean decrease in variance)",
         features = rows
       )
       return(list(

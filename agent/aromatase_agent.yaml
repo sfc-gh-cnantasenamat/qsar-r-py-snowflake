@@ -1,0 +1,142 @@
+models:
+  orchestration: claude-sonnet-4-6
+orchestration:
+  budget:
+    seconds: 90
+    tokens: 16000
+instructions:
+  response: |
+    You are an aromatase bioactivity research assistant. Give measured and
+    predicted values separately, with ChEMBL identifiers when available.
+    This teaching model is not validated for clinical or drug-development use.
+    The 5th and 95th quantiles are not calibrated confidence intervals.
+    Rule of Five passes when there are at most one of four violations:
+    MW > 500, LogP > 5, HBD > 5, or HBA > 10. Do not call zero
+    violations the only passing state.
+    Tanimoto similarity is a heuristic over all measured compounds, including
+    held-out data, not a validated applicability-domain measure. Global
+    regression impurity importance of present bits is not a local attribution
+    or causal explanation.
+    A near-zero mean error on the combined training/test dataset does not
+    prove calibration or out-of-sample accuracy. Avoid calling this model
+    well-calibrated; compare held-out metrics separately.
+    A potent predicted steroid may disagree with experimental measurements;
+    check the measurements before drawing a conclusion. For every assay
+    condition reported from Search, include its CHEMBL assay identifier.
+    ASSAY_CHEMBL_ID is the assay ID; DOCUMENT_CHEMBL_ID is the publication
+    ID. Search citations use ASSAY_CHEMBL_ID as doc_id and doc_title; do not
+    mistake that citation label for a publication ID. Never describe assay
+    conditions without their assay ID or invent them.
+  orchestration: |
+    For dataset totals, measured values, descriptors, or error analysis use
+    Analyst. For assay or publication wording use Search and report source IDs.
+    For a SMILES prediction use Predict; for several SMILES, one per line, use
+    Triage; for fingerprint environments and present important bits use Explain.
+    Do not use web search. Use data_to_chart only when the user explicitly
+    requests a chart or visualization of tabular tool results.
+  sample_questions:
+    - question: How many measured aromatase compounds are active?
+    - question: What assay conditions were reported for exemestane?
+    - question: Predict and explain letrozole's aromatase activity.
+tools:
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: Analyst
+      description: Query measured bioactivity, model scores, and molecular descriptors.
+  - tool_spec:
+      type: cortex_search
+      name: Search
+      description: Search ChEMBL assay descriptions and publication titles and abstracts.
+  - tool_spec:
+      type: generic
+      name: Predict
+      description: Predict aromatase pIC50 for one SMILES with uncalibrated quantiles.
+      input_schema:
+        type: object
+        properties:
+          smiles:
+            type: string
+            description: One valid molecular SMILES string.
+        required: [smiles]
+  - tool_spec:
+      type: generic
+      name: Triage
+      description: Rank up to 20 candidate SMILES separated by newline, including similarity and Rule of Five.
+      input_schema:
+        type: object
+        properties:
+          smiles_list:
+            type: string
+            description: Candidate SMILES, one per line (maximum 20).
+        required: [smiles_list]
+  - tool_spec:
+      type: generic
+      name: Explain
+      description: Show globally important model bits present in a molecule and their CDK substructures.
+      input_schema:
+        type: object
+        properties:
+          smiles:
+            type: string
+            description: One molecular SMILES string.
+          n:
+            type: integer
+            description: Number of present features to return, between 1 and 10.
+        required: [smiles, n]
+  - tool_spec:
+      type: data_to_chart
+      name: data_to_chart
+      description: Plot tabular data returned by the other tools.
+tool_resources:
+  Analyst:
+    semantic_view: QSAR_DB.PUBLIC.AROMATASE_SV
+    execution_environment:
+      type: warehouse
+      warehouse: QSAR_WH
+  Search:
+    search_service: QSAR_DB.PUBLIC.ASSAY_SEARCH
+    max_results: 5
+    title_column: ASSAY_CHEMBL_ID
+    id_column: ASSAY_CHEMBL_ID
+    columns_and_descriptions:
+      SEARCH_TEXT:
+        description: ChEMBL assay description plus linked publication title, abstract, and journal.
+        type: string
+        searchable: true
+        filterable: false
+      MOLECULE_CHEMBL_ID:
+        description: ChEMBL molecule identifier, such as CHEMBL1200374 (exemestane).
+        type: string
+        searchable: false
+        filterable: true
+      ASSAY_CHEMBL_ID:
+        description: ChEMBL assay identifier.
+        type: string
+        searchable: false
+        filterable: true
+      DOCUMENT_CHEMBL_ID:
+        description: ChEMBL publication identifier.
+        type: string
+        searchable: false
+        filterable: true
+  Predict:
+    type: function
+    identifier: QSAR_DB.PUBLIC.PREDICT_PIC50
+    name: PREDICT_PIC50(VARCHAR)
+    execution_environment:
+      type: warehouse
+      warehouse: QSAR_WH
+  Triage:
+    type: procedure
+    identifier: QSAR_DB.PUBLIC.TRIAGE_COMPOUNDS
+    name: TRIAGE_COMPOUNDS(VARCHAR)
+    execution_environment:
+      type: warehouse
+      warehouse: QSAR_WH
+  Explain:
+    type: function
+    identifier: QSAR_DB.PUBLIC.EXPLAIN_PREDICTION
+    name: EXPLAIN_PREDICTION(VARCHAR, NUMBER)
+    execution_environment:
+      type: warehouse
+      warehouse: QSAR_WH
