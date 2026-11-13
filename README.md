@@ -10,19 +10,19 @@ A QSAR (quantitative structure-activity relationship) model, trained in R, predi
 | Training | R: `rcdk` ECFP4 fingerprints, `caret`, `ranger` quantile random forest | `docker/train_rcdk.R` |
 | Serving | R Plumber container on Snowpark Container Services (SPCS) | `docker/Dockerfile.plumber`, `docker/plumber_api.R` |
 | App | Streamlit in Snowflake | `streamlit/` |
-| AI assistants | MCP endpoint; optional in-platform Cortex Agent | `/mcp` in `plumber_api.R`, `agent/` |
+| AI assistants | MCP endpoint and in-platform Cortex Agent | `/mcp` in `plumber_api.R`, `agent/` |
 
 ## Repository layout
 
 ```
 data/        Snapshot of the cleaned ChEMBL1978 IC50 dataset (2,751 compounds) used for the bundled model
 docker/      R training script, Plumber API, Dockerfile, SPCS spec, bundled model artifacts
-streamlit/   Multipage app; optional Ask an Agent page appears when an agent exists
+streamlit/   Multipage app (Dashboard, Single Prediction, Batch Prediction, About, and Ask an Agent)
 notebooks/   01: raw ChEMBL, assays, publications, and EDA; 02: SQL scoring and agent tables
-agent/       Optional agent spec and evaluation cases
+agent/       Cortex Agent spec and 15-question evaluation fixtures
 native_app/  Optional Native App package for per-consumer MCP deployment
-scripts/     Endpoint smoke test and dashboard data generator
-sql/         Setup, R-backed SQL functions, and optional semantic view, search and triage
+scripts/     Endpoint smoke test, dashboard data generator, and agent deployment script
+sql/         Setup, R-backed SQL functions, semantic view, Cortex Search, and triage procedure
 docs/        MCP walkthrough
 ```
 
@@ -83,9 +83,8 @@ The developer guide walks through each step in detail.
    export SNOWFLAKE_PAT="<programmatic access token>"
    python scripts/test_endpoint.py
    ```
- 6. **Create the shared SQL functions** by running `sql/functions.sql` after the service is READY. They expose R-backed `ECFP4`, `PREDICT_PIC50`, `SIMILAR_COMPOUNDS`, and `EXPLAIN_PREDICTION`, plus RDKit `RO5`. The setup grants `SNOWFLAKE.PYPI_REPOSITORY_USER` to pin RO5 to RDKit 2025.09.3.
-
-    **Score the compounds** for the dashboard with `02_score_compounds.ipynb`, and upload the model metadata the app reads:
+6. **Connect an AI assistant** to the MCP endpoint at `https://<ingress_url>/mcp` using a PAT restricted to `QSAR_ROLE`. See `docs/mcp-walkthrough.md`.
+7. **Create the shared SQL functions and score the compounds.** Run `sql/functions.sql` after the service is READY to expose R-backed `ECFP4`, `PREDICT_PIC50`, `SIMILAR_COMPOUNDS`, and `EXPLAIN_PREDICTION`, plus RDKit `RO5` (pinned to RDKit 2025.09.3 via `SNOWFLAKE.PYPI_REPOSITORY_USER`). Then batch-score all 2,751 compounds with `02_score_compounds.ipynb`:
    ```sql
    USE ROLE QSAR_ROLE;
    USE WAREHOUSE QSAR_WH;
@@ -96,37 +95,24 @@ The developer guide walks through each step in detail.
        RUNTIME = 'V2-CPU-PY3.12'
        EXTERNAL_ACCESS_INTEGRATIONS = (QSAR_NB_EAI);
    ```
+8. **Stage dashboard files and deploy the Streamlit app.** Upload the model metadata that the Dashboard and About pages read, then deploy the app (in Snowflake, the app discovers the service's internal DNS name from `SHOW SERVICES` automatically):
    ```bash
    cp docker/top_features_rcdk.csv /tmp/top_features.csv
    snow sql -q "PUT file:///tmp/top_features.csv @QSAR_DB.PUBLIC.QSAR_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE"
    snow sql -q "PUT file://docker/training_metrics.json @QSAR_DB.PUBLIC.QSAR_STAGE AUTO_COMPRESS=FALSE OVERWRITE=TRUE"
-   ```
- 7. **Deploy the Streamlit app.** In Snowflake, the app reads the `dns_name` from `SHOW SERVICES` automatically. For local use, configure `spcs.predict_url` in Streamlit secrets. Then:
-   ```bash
    cd streamlit
    snow streamlit deploy --replace
+   cd ..
    ```
- 8. Optionally, **connect an AI assistant** to the MCP endpoint at `https://<ingress_url>/mcp`. See `docs/mcp-walkthrough.md`.
+9. **Deploy and evaluate the Cortex Agent (`AROMATASE_AGENT`).** Notebook 01 fetches 313 assay descriptions and 198 publication records, and Notebook 02 writes per-molecule predictions, full CDK fingerprints, and Rule of Five descriptors. Run `sql/agent.sql` to create the `AROMATASE_SV` semantic view, `ASSAY_SEARCH` Cortex Search service, and `TRIAGE_COMPOUNDS` procedure, then deploy `AROMATASE_AGENT` from `agent/aromatase_agent.yaml`:
+   ```bash
+   python scripts/deploy_agent.py --connection <your_connection>
+   ```
+   This grants `QSAR_ROLE` invocation access and adds `AROMATASE_AGENT` to Snowflake Intelligence. The Streamlit **Ask an Agent** page appears when the app's Snowflake session can see the agent. It uses Analyst for measured data, Search for assay/publication text, and the R-backed functions for prediction, similarity, and explanation. A triage call accepts at most 20 SMILES, one per line. Similarity searches all measured compounds, including held-out rows, so it is not a validated applicability-domain estimate. Explanations use global regression impurity importance for bits present in a SMILES, not causal or local attributions.
 
-### Optional: Aromatase analyst
+   The 15-question evaluation fixtures and YAML are in `agent/eval_questions.sql` and `agent/eval_config.yaml`. Their expected predictions refer to the **bundled model**, so update the ground truth after retraining on notebook output. Run the SQL, stage the YAML, then start and inspect a Cortex Agent evaluation with `EXECUTE_AI_EVALUATION`. For repeat runs on the same dataset, remove the `dataset` block from the staged YAML and choose a new run name. In the isolated prototype, all 15 cases completed with mean answer correctness 0.956, logical consistency 0.956, and tool selection 0.967; those scores are not predictive-model accuracy. The guide contains the commands for running and checking the evaluation.
 
-This section documents an optional extension that was first tested in isolated `QSAR_AG_*` objects. As of 2026-11-09 it is also available in the live `QSAR_DB.PUBLIC` demo: the Agent, semantic view, Search service, triage procedure, shared functions, and supporting tables are present. The live Plumber service runs the Agent-capable `v6-agent` image, and the Streamlit app's active `VERSION$10` includes the conditional **Ask an Agent** page. The core app and MCP endpoint still work without the Agent. SQL Agent requests and the R service were smoke-tested after rollout; authenticated browser rendering of the new app page remains unverified.
-
-The live deployment is owned by `ACCOUNTADMIN`. The guide's `QSAR_ROLE` was not present in the existing live account, so its role-specific grant and `scripts/deploy_agent.py` were not used for that deployment; readers who run the guide's setup should follow its grants in their own environment. The isolated `QSAR_AG_*` prototype remains intact.
-
-The local bundled-model shortcut produces dashboard CSVs, not Snowflake tables. Before following this optional section, run notebook 01, `sql/functions.sql`, and notebook 02 even if you served the bundled model. They create the compound, assay, publication, prediction, fingerprint, and descriptor tables that the agent requires.
-
-Notebook 01 also fetches 313 assay descriptions and 198 publication records. Notebook 02 writes per-molecule predictions, full CDK fingerprints, and Rule of Five descriptors. After the core flow, run `sql/agent.sql` to create the `AROMATASE_SV` semantic view, `ASSAY_SEARCH` Cortex Search service and `TRIAGE_COMPOUNDS` procedure. The agent DDL is generated from `agent/aromatase_agent.yaml`:
-
-```bash
-python scripts/deploy_agent.py --connection <your_connection>
-```
-
-This grants `QSAR_ROLE` invocation access and adds `AROMATASE_AGENT` to Snowflake Intelligence. The Streamlit **Ask an Agent** page appears when the app's Snowflake session can see the agent. It uses Analyst for measured data, Search for assay/publication text, and the R-backed functions for prediction, similarity and explanation. A triage call accepts at most 20 SMILES, one per line. Similarity searches all measured compounds, including held-out rows, so it is not a validated applicability-domain estimate. Explanations use global regression impurity importance for bits present in a SMILES, not causal or local attributions.
-
-The 15-question evaluation fixtures and YAML are in `agent/eval_questions.sql` and `agent/eval_config.yaml`. Their expected predictions refer to the **bundled model**, so update the ground truth after retraining on notebook output. Run the SQL, stage the YAML, then start and inspect a Cortex Agent evaluation with `EXECUTE_AI_EVALUATION`. For repeat runs on the same dataset, remove the `dataset` block from the staged YAML and choose a new run name. In the isolated prototype, all 15 cases completed with mean answer correctness 0.956, logical consistency 0.956, and tool selection 0.967; those scores are not predictive-model accuracy. These optional components incur Cortex and Cortex Search costs. The guide contains the commands for running and checking the evaluation.
-
-To skip steps 2 and 3, build the image from the bundled model in `docker/`, which was trained on the snapshot in `data/`. In that case, install `requests pandas toml snowflake-connector-python 'rdkit==2025.09.3'` in your Python 3.11 environment and generate dashboard data from a laptop with `scripts/generate_dashboard_data.py`, which reads `data/chembl1978_cleaned.csv` and calls the public endpoint with a PAT. To add the optional agent later, run both notebooks as described above.
+To skip steps 2 and 3 for the dashboard only, build the image from the bundled model in `docker/`, which was trained on the snapshot in `data/`, install `requests pandas toml snowflake-connector-python 'rdkit==2025.09.3'` in your Python 3.11 environment, and generate dashboard CSVs from a laptop with `scripts/generate_dashboard_data.py`. Note that `AROMATASE_AGENT` requires the Snowflake tables created by both notebooks and `sql/functions.sql`.
 
 ## Clean up
 
