@@ -3,7 +3,16 @@ QSAR Aromatase Inhibitor Predictor — entry point.
 Initialises the Snowflake session and routes to pages.
 """
 
+import importlib
+
 import streamlit as st
+import _shared
+
+# The container can retain an earlier imported module after a versioned app
+# update. Reload it only when that version lacks a helper used by the pages.
+if not hasattr(_shared, "running_in_snowflake"):
+    importlib.reload(_shared)
+
 from _shared import _DB_SCHEMA, init_session
 
 st.set_page_config(

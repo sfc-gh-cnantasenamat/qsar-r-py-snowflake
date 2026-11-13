@@ -37,17 +37,23 @@ fp_matrix           <- do.call(rbind, fps)
 colnames(fp_matrix) <- paste0("bit_", seq_len(1024))
 cat(sprintf("  Avg ON bits per molecule: %.1f\n", mean(rowSums(fp_matrix))))
 
-# ── Remove zero-variance bits ──────────────────────────────────────────────────
-cat("Removing zero-variance bits...\n")
-nzv_idx <- nearZeroVar(fp_matrix, saveMetrics = FALSE)
-if (length(nzv_idx) > 0) fp_matrix <- fp_matrix[, -nzv_idx]
-cat(sprintf("  Kept %d / 1024 bits\n", ncol(fp_matrix)))
-
 # ── Train/test split ───────────────────────────────────────────────────────────
-train_idx <- createDataPartition(df$pchembl_value, p = 0.8, list = FALSE)
-train_df  <- as.data.frame(fp_matrix[ train_idx, ])
+train_idx <- as.vector(createDataPartition(df$pchembl_value, p = 0.8, list = FALSE))
+train_x   <- fp_matrix[ train_idx, , drop = FALSE]
+test_x    <- fp_matrix[-train_idx, , drop = FALSE]
+
+# ── Select features using training molecules only ─────────────────────────────
+cat("Removing near-zero-variance bits from the training set...\n")
+nzv_idx <- nearZeroVar(train_x, saveMetrics = FALSE)
+if (length(nzv_idx) > 0) train_x <- train_x[, -nzv_idx, drop = FALSE]
+kept <- colnames(train_x)
+if (length(kept) == 0) stop("No fingerprint bits remain after filtering")
+test_x <- test_x[, kept, drop = FALSE]
+stopifnot(identical(colnames(train_x), colnames(test_x)))
+cat(sprintf("  Kept %d / 1024 bits\n", length(kept)))
+
+train_df  <- as.data.frame(train_x)
 train_df$target <- df$pchembl_value[ train_idx]
-test_x    <- fp_matrix[-train_idx, ]
 test_y    <- df$pchembl_value[-train_idx]
 cat(sprintf("Train: %d  |  Test: %d\n", nrow(train_df), length(test_y)))
 
@@ -74,7 +80,6 @@ saveRDS(model, "/output/qsar_aromatase_model_rcdk.rds")
 cat(sprintf("  Saved model: %d KB\n",
             as.integer(file.info("/output/qsar_aromatase_model_rcdk.rds")$size / 1024)))
 
-kept <- colnames(fp_matrix)
 write.csv(data.frame(bit = kept), "/output/kept_bits_rcdk.csv", row.names = FALSE)
 
 imp    <- model$variable.importance
@@ -99,7 +104,7 @@ metrics <- list(
   n_active    = sum(df$activity_class),
   n_train     = nrow(train_df),
   n_test      = length(test_y),
-  n_bits      = ncol(fp_matrix),
+  n_bits      = length(kept),
   n_trees     = model$num.trees,
   fingerprint = sprintf("CDK ECFP4 (rcdk %s)", packageVersion("rcdk")),
   model       = "ranger quantile RF"

@@ -64,6 +64,11 @@ The developer guide walks through each step in detail.
    cp output/kept_bits_rcdk.csv docker/kept_bits.csv
     cp output/top_features_rcdk.csv output/training_metrics.json output/train_fingerprints.csv docker/
    ```
+   `train_rcdk.R` splits the molecules before selecting fingerprint bits. Copy
+   the saved bit list and model together: retraining can change the selected
+   columns and predictions. The bundled `docker/` artifacts and live demo still
+   represent the earlier run; a corrected local candidate in `output/` has not
+   replaced either one.
 4. **Build and push the serving image**, which bakes in the trained model:
    ```bash
    cd docker
@@ -105,7 +110,9 @@ The developer guide walks through each step in detail.
 
 ### Optional: Aromatase analyst
 
-This section documents an isolated `QSAR_AG_*` prototype, not a feature of the current live `QSAR_DB` service or app. Deploying these optional objects to `QSAR_DB` and updating the live app require a separate rollout decision.
+This section documents an optional extension that was first tested in isolated `QSAR_AG_*` objects. As of 2026-11-09 it is also available in the live `QSAR_DB.PUBLIC` demo: the Agent, semantic view, Search service, triage procedure, shared functions, and supporting tables are present. The live Plumber service runs the Agent-capable `v6-agent` image, and the Streamlit app's active `VERSION$10` includes the conditional **Ask an Agent** page. The core app and MCP endpoint still work without the Agent. SQL Agent requests and the R service were smoke-tested after rollout; authenticated browser rendering of the new app page remains unverified.
+
+The live deployment is owned by `ACCOUNTADMIN`. The guide's `QSAR_ROLE` was not present in the existing live account, so its role-specific grant and `scripts/deploy_agent.py` were not used for that deployment; readers who run the guide's setup should follow its grants in their own environment. The isolated `QSAR_AG_*` prototype remains intact.
 
 The local bundled-model shortcut produces dashboard CSVs, not Snowflake tables. Before following this optional section, run notebook 01, `sql/functions.sql`, and notebook 02 even if you served the bundled model. They create the compound, assay, publication, prediction, fingerprint, and descriptor tables that the agent requires.
 
@@ -148,7 +155,7 @@ After you change names, run the grants check from the guide's Setup section with
 
 This is a teaching example, not a validated drug discovery model.
 
-- **Feature filtering before the split.** `nearZeroVar()` runs on all compounds before the 80/20 split, so the test set influences which bits are kept.
+- **Bundled-model feature filtering.** The currently bundled model was trained with `nearZeroVar()` before the 80/20 split, so test molecules influenced which bits were kept. The corrected training script splits first and selects bits from training molecules only; its new artifacts have not replaced the bundled or deployed model.
 - **Reported R2 is squared correlation.** `test_r2` is `cor(pred, y)^2`, not `1 - SSE/SST`. RMSE is computed conventionally.
 - **One split, order-dependent.** The 80/20 split is drawn by row position with a fixed seed, so the same compounds in a different row order give different metrics. Training on notebook 01's output gives test R2 0.6537 and RMSE 0.7949; the bundled model, trained on the `data/` snapshot, gives 0.6855 and 0.7708. Cross-validation would give a more stable estimate.
 - **Quantiles are not calibrated intervals.** The 5th to 95th percentile range from the quantile forest is labelled "90% CI" in API output but has not been calibrated.

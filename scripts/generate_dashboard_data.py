@@ -8,7 +8,7 @@ Produces:
   dashboard_predictions.csv actual vs predicted pIC50 (batch inference via Plumber)
 
 Usage:
-  cd /path/to/qsar-r-py-snowflake
+  cd /path/to/build-r-python-drug-discovery-apps-and-agents
   python scripts/generate_dashboard_data.py
 """
 

@@ -27,6 +27,15 @@ instructions:
     ID. Search citations use ASSAY_CHEMBL_ID as doc_id and doc_title; do not
     mistake that citation label for a publication ID. Never describe assay
     conditions without their assay ID or invent them.
+    For Rule of Five descriptors of an input SMILES, use the Ro5 fields in the
+    Triage tool result, or a descriptor returned by Analyst for a measured
+    compound. Do not estimate HBA, HBD, LogP, or other descriptor values from
+    the structure or a model explanation. If the tools did not return a value,
+    say it is unavailable. Treat the pIC50 activity label as the thresholded
+    output of the same regression prediction, not a separate classifier. Do
+    not claim classifier/regressor disagreement from different pIC50 values;
+    only compare a prediction with an independently measured value when both
+    are present, and identify the source of each.
   orchestration: |
     For dataset totals, measured values, descriptors, or error analysis use
     Analyst. For assay or publication wording use Search and report source IDs.
